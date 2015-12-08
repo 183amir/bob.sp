@@ -17,6 +17,7 @@ int PyBobSp_APIVersion = BOB_SP_API_VERSION;
 #include <bob.blitz/cleanup.h>
 #include <bob.core/api.h>
 
+#include "main.h"
 
 extern PyTypeObject PyBobSpFFT1D_Type;
 extern PyTypeObject PyBobSpIFFT1D_Type;
@@ -145,57 +146,6 @@ version of theinput.\n\
 ");
 PyObject* ifftshift(PyObject*, PyObject* args, PyObject* kwds);
 
-PyDoc_STRVAR(s_dct_str, "dct");
-PyDoc_STRVAR(s_dct_doc,
-"dct(src, [dst]) -> array\n\
-\n\
-Computes the direct Discrete Cosine Transform of a 1D or 2D\n\
-array/signal of type ``float64``. Allocates a new output\n\
-array if ``dst`` is not provided. If it is, then it must\n\
-be of the same type and shape as ``src``.\n\
-\n\
-Parameters:\n\
-\n\
-src\n\
-  [array] A 1 or 2-dimensional array of type ``float64``\n\
-  in which the DCT operation will be performed.\n\
-\n\
-dst\n\
-  [array, optional] A 1 or 2-dimensional array of type\n\
-  ``float64`` and matching dimensions to ``src`` in\n\
-  which the result of the operation will be stored.\n\
-\n\
-Returns a 1 or 2-dimensional array, of the same dimension\n\
-as ``src``, of type ``float64``, containing the DCT of\n\
-the input signal.\n\
-");
-PyObject* dct(PyObject*, PyObject* args, PyObject* kwds);
-
-PyDoc_STRVAR(s_idct_str, "idct");
-PyDoc_STRVAR(s_idct_doc,
-"idct(src, [dst]) -> array\n\
-\n\
-Computes the inverse Discrete Cosinte Transform of a 1D or 2D\n\
-transform of type ``float64``. Allocates a new output\n\
-array if ``dst`` is not provided. If it is, then it must\n\
-be of the same type and shape as ``src``.\n\
-\n\
-Parameters:\n\
-\n\
-src\n\
-  [array] A 1 or 2-dimensional array of type ``float64``\n\
-  in which the inverse DCT operation will be performed.\n\
-\n\
-dst\n\
-  [array, optional] A 1 or 2-dimensional array of type\n\
-  ``float64`` and matching dimensions to ``src`` in\n\
-  which the result of the operation will be stored.\n\
-\n\
-Returns a 1 or 2-dimensional array, of the same dimension\n\
-as ``src``, of type ``float64``, containing the inverse\n\
-DCT of the input transform.\n\
-");
-PyObject* idct(PyObject*, PyObject* args, PyObject* kwds);
 
 static PyMethodDef module_methods[] = {
     {
@@ -229,16 +179,16 @@ static PyMethodDef module_methods[] = {
       s_ifftshift_doc
     },
     {
-      s_dct_str,
-      (PyCFunction)dct,
+      s_dct.name(),
+      (PyCFunction)PyBobSpDCT,
       METH_VARARGS|METH_KEYWORDS,
-      s_dct_doc
+      s_dct.doc()
     },
     {
-      s_idct_str,
-      (PyCFunction)idct,
+      s_idct.name(),
+      (PyCFunction)PyBobSpIDCT,
       METH_VARARGS|METH_KEYWORDS,
-      s_idct_doc
+      s_idct.doc()
     },
     {0}  /* Sentinel */
 };
@@ -270,14 +220,8 @@ static PyObject* create_module (void) {
   PyBobSpIFFT2D_Type.tp_new = PyType_GenericNew;
   if (PyType_Ready(&PyBobSpIFFT2D_Type) < 0) return 0;
 
-  PyBobSpDCT1D_Type.tp_new = PyType_GenericNew;
-  if (PyType_Ready(&PyBobSpDCT1D_Type) < 0) return 0;
-
   PyBobSpIDCT1D_Type.tp_new = PyType_GenericNew;
   if (PyType_Ready(&PyBobSpIDCT1D_Type) < 0) return 0;
-
-  PyBobSpDCT2D_Type.tp_new = PyType_GenericNew;
-  if (PyType_Ready(&PyBobSpDCT2D_Type) < 0) return 0;
 
   PyBobSpIDCT2D_Type.tp_new = PyType_GenericNew;
   if (PyType_Ready(&PyBobSpIDCT2D_Type) < 0) return 0;
@@ -289,45 +233,43 @@ static PyObject* create_module (void) {
   if (PyType_Ready(&PyBobSpQuantization_Type) < 0) return 0;
 
 # if PY_VERSION_HEX >= 0x03000000
-  PyObject* m = PyModule_Create(&module_definition);
-  auto m_ = make_xsafe(m);
+  PyObject* module = PyModule_Create(&module_definition);
+  auto module_ = make_xsafe(module);
   const char* ret = "O";
 # else
-  PyObject* m = Py_InitModule3(BOB_EXT_MODULE_NAME, module_methods, module_docstr);
+  PyObject* module = Py_InitModule3(BOB_EXT_MODULE_NAME, module_methods, module_docstr);
   const char* ret = "N";
 # endif
-  if (!m) return 0;
+  if (!module) return 0;
 
   /* register the types to python */
   Py_INCREF(&PyBobSpFFT1D_Type);
-  if (PyModule_AddObject(m, "FFT1D", (PyObject *)&PyBobSpFFT1D_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "FFT1D", (PyObject *)&PyBobSpFFT1D_Type) < 0) return 0;
 
   Py_INCREF(&PyBobSpIFFT1D_Type);
-  if (PyModule_AddObject(m, "IFFT1D", (PyObject *)&PyBobSpIFFT1D_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "IFFT1D", (PyObject *)&PyBobSpIFFT1D_Type) < 0) return 0;
 
   Py_INCREF(&PyBobSpFFT2D_Type);
-  if (PyModule_AddObject(m, "FFT2D", (PyObject *)&PyBobSpFFT2D_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "FFT2D", (PyObject *)&PyBobSpFFT2D_Type) < 0) return 0;
 
   Py_INCREF(&PyBobSpIFFT2D_Type);
-  if (PyModule_AddObject(m, "IFFT2D", (PyObject *)&PyBobSpIFFT2D_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "IFFT2D", (PyObject *)&PyBobSpIFFT2D_Type) < 0) return 0;
 
-  Py_INCREF(&PyBobSpDCT1D_Type);
-  if (PyModule_AddObject(m, "DCT1D", (PyObject *)&PyBobSpDCT1D_Type) < 0) return 0;
+  if (!init_BobSpDCT1D(module)) return 0;
 
   Py_INCREF(&PyBobSpIDCT1D_Type);
-  if (PyModule_AddObject(m, "IDCT1D", (PyObject *)&PyBobSpIDCT1D_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "IDCT1D", (PyObject *)&PyBobSpIDCT1D_Type) < 0) return 0;
 
-  Py_INCREF(&PyBobSpDCT2D_Type);
-  if (PyModule_AddObject(m, "DCT2D", (PyObject *)&PyBobSpDCT2D_Type) < 0) return 0;
+  if (!init_BobSpDCT2D(module)) return 0;
 
   Py_INCREF(&PyBobSpIDCT2D_Type);
-  if (PyModule_AddObject(m, "IDCT2D", (PyObject *)&PyBobSpIDCT2D_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "IDCT2D", (PyObject *)&PyBobSpIDCT2D_Type) < 0) return 0;
 
   Py_INCREF(&PyBobSpExtrapolationBorder_Type);
-  if (PyModule_AddObject(m, "BorderType", (PyObject *)&PyBobSpExtrapolationBorder_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "BorderType", (PyObject *)&PyBobSpExtrapolationBorder_Type) < 0) return 0;
 
   Py_INCREF(&PyBobSpQuantization_Type);
-  if (PyModule_AddObject(m, "Quantization", (PyObject *)&PyBobSpQuantization_Type) < 0) return 0;
+  if (PyModule_AddObject(module, "Quantization", (PyObject *)&PyBobSpQuantization_Type) < 0) return 0;
 
   // initialize the PyBobSp_API
   initialize_api();
@@ -346,13 +288,13 @@ static PyObject* create_module (void) {
 
   if (!c_api_object) return 0;
 
-  if (PyModule_AddObject(m, "_C_API", c_api_object) < 0) return 0;
+  if (PyModule_AddObject(module, "_C_API", c_api_object) < 0) return 0;
 
   /* imports dependencies */
   if (import_bob_blitz() < 0) return 0;
   if (import_bob_core_logging() < 0) return 0;
 
-  return Py_BuildValue(ret, m);
+  return Py_BuildValue(ret, module);
 }
 
 PyMODINIT_FUNC BOB_EXT_ENTRY_NAME (void) {

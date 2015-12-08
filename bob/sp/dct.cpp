@@ -5,13 +5,9 @@
  * @brief Methods for quick DCT/IDCT calculation
  */
 
-#include <bob.blitz/cppapi.h>
-#include <bob.blitz/cleanup.h>
-#include <bob.sp/DCT1D.h>
-#include <bob.sp/DCT2D.h>
+#include "main.h"
 
-static int check_and_allocate(boost::shared_ptr<PyBlitzArrayObject>& input,
-    boost::shared_ptr<PyBlitzArrayObject>& output) {
+static PyBlitzArrayObject* check_and_allocate(PyBlitzArrayObject* input, PyBlitzArrayObject* output) {
 
   if (input->type_num != NPY_FLOAT64) {
     PyErr_SetString(PyExc_TypeError, "method only supports 64-bit float arrays for input array `input'");
@@ -34,7 +30,6 @@ static int check_and_allocate(boost::shared_ptr<PyBlitzArrayObject>& input,
   }
 
   if (output) {
-
     if (input->ndim == 1) {
       if (output->shape[0] != input->shape[0]) {
         PyErr_Format(PyExc_RuntimeError, "1D `output' array should have %" PY_FORMAT_SIZE_T "d elements matching output size, not %" PY_FORMAT_SIZE_T "d elements", input->shape[0], output->shape[0]);
@@ -51,26 +46,29 @@ static int check_and_allocate(boost::shared_ptr<PyBlitzArrayObject>& input,
         return 0;
       }
     }
+    Py_INCREF(output);
+  } else {
+    output = (PyBlitzArrayObject*)PyBlitzArray_SimpleNew(NPY_FLOAT64, input->ndim, input->shape);
   }
-
-  else {
-
-    auto tmp = (PyBlitzArrayObject*)PyBlitzArray_SimpleNew(NPY_FLOAT64, input->ndim, input->shape);
-    if (!tmp) return 0;
-    output = make_safe(tmp);
-
-  }
-
-  return 1;
-
+  return output;
 }
 
-PyObject* dct(PyObject*, PyObject* args, PyObject* kwds) {
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+bob::extension::FunctionDoc s_dct = bob::extension::FunctionDoc(
+  "dct",
+  "Computes the direct Discrete Cosine Transform of a 1D or 2D array/signal of type ``float64``",
+  "Allocates a new output array if ``dst`` is not provided. If it is, then it must be of the same type and shape as ``src``."
+)
+.add_prototype("src, [dst]", "dst")
+.add_parameter("src", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` for which the DCT operation will be performed")
+.add_parameter("dst", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
+.add_return("dst", "array_like(1D or 2D, float)", "The 1 or 2-dimensional array of type ``float64`` of the same dimension as ``src`` and of type ``float64``, containing the DCT of the ``src`` input signal")
+;
+PyObject* PyBobSpDCT(PyObject*, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_dct.kwlist();
 
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -82,45 +80,40 @@ PyObject* dct(PyObject*, PyObject* args, PyObject* kwds) {
   auto input_ = make_safe(input);
   auto output_ = make_xsafe(output);
 
-  check_and_allocate(input_, output_);
-
-  output = output_.get();
+  output = check_and_allocate(input, output);
+  if (!output) return 0;
+  output_ = make_safe(output);
 
   /** all basic checks are done, can call the operator now **/
-  try {
-
-    if (input->ndim == 1) {
-      bob::sp::DCT1D op(input->shape[0]);
-      op(*PyBlitzArrayCxx_AsBlitz<double,1>(input),
-          *PyBlitzArrayCxx_AsBlitz<double,1>(output));
-    }
-
-    else { // input->ndim == 2
-      bob::sp::DCT2D op(input->shape[0], input->shape[1]);
-      op(*PyBlitzArrayCxx_AsBlitz<double,2>(input),
-          *PyBlitzArrayCxx_AsBlitz<double,2>(output));
-    }
-
-  }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_SetString(PyExc_RuntimeError, "cannot operate on data: unknown exception caught");
-    return 0;
+  if (input->ndim == 1) {
+    bob::sp::DCT1D op(input->shape[0]);
+    op(*PyBlitzArrayCxx_AsBlitz<double,1>(input), *PyBlitzArrayCxx_AsBlitz<double,1>(output));
   }
 
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  else { // input->ndim == 2
+    bob::sp::DCT2D op(input->shape[0], input->shape[1]);
+    op(*PyBlitzArrayCxx_AsBlitz<double,2>(input), *PyBlitzArrayCxx_AsBlitz<double,2>(output));
+  }
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_FUNCTION("dct", 0)
 }
 
-PyObject* idct(PyObject*, PyObject* args, PyObject* kwds) {
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+bob::extension::FunctionDoc s_idct = bob::extension::FunctionDoc(
+  "idct",
+  "Computes the inverse Discrete Cosinte Transform of a 1D or 2D array/signal of type ``float64``",
+  "Allocates a new output array if ``dst`` is not provided. If it is, then it must be of the same type and shape as ``src``."
+)
+.add_prototype("src, [dst]", "dst")
+.add_parameter("src", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` for which the inverse DCT operation will be performed")
+.add_parameter("dst", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
+.add_return("dst", "array_like(1D or 2D, float)", "The 1 or 2-dimensional array of type ``float64`` of the same dimension as ``src`` and of type ``float64``, containing the inverse DCT of the ``src`` input signal")
+;
+PyObject* PyBobSpIDCT(PyObject*, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_idct.kwlist();
 
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -132,35 +125,18 @@ PyObject* idct(PyObject*, PyObject* args, PyObject* kwds) {
   auto input_ = make_safe(input);
   auto output_ = make_xsafe(output);
 
-  check_and_allocate(input_, output_);
-
-  output = output_.get();
+  output = check_and_allocate(input, output);
+  if (!output) return 0;
+  output_ = make_safe(output);
 
   /** all basic checks are done, can call the operator now **/
-  try {
-
-    if (input->ndim == 1) {
-      bob::sp::IDCT1D op(input->shape[0]);
-      op(*PyBlitzArrayCxx_AsBlitz<double,1>(input),
-          *PyBlitzArrayCxx_AsBlitz<double,1>(output));
-    }
-
-    else { // input->ndim == 2
-      bob::sp::IDCT2D op(input->shape[0], input->shape[1]);
-      op(*PyBlitzArrayCxx_AsBlitz<double,2>(input),
-          *PyBlitzArrayCxx_AsBlitz<double,2>(output));
-    }
-
+  if (input->ndim == 1) {
+    bob::sp::IDCT1D op(input->shape[0]);
+    op(*PyBlitzArrayCxx_AsBlitz<double,1>(input), *PyBlitzArrayCxx_AsBlitz<double,1>(output));
+  } else { // input->ndim == 2
+    bob::sp::IDCT2D op(input->shape[0], input->shape[1]);
+    op(*PyBlitzArrayCxx_AsBlitz<double,2>(input), *PyBlitzArrayCxx_AsBlitz<double,2>(output));
   }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_SetString(PyExc_RuntimeError, "cannot operate on data: unknown exception caught");
-    return 0;
-  }
-
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_FUNCTION("idct", 0)
 }

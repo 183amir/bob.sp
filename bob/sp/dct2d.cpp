@@ -7,114 +7,63 @@
  * Copyright (C) 2011-2013 Idiap Research Institute, Martigny, Switzerland
  */
 
-#include <bob.blitz/cppapi.h>
-#include <bob.blitz/cleanup.h>
-#include <bob.extension/defines.h>
-#include <bob.sp/DCT2D.h>
+#include "main.h"
 
-PyDoc_STRVAR(s_fft2d_str, BOB_EXT_MODULE_PREFIX ".DCT2D");
-
-PyDoc_STRVAR(s_fft2d_doc,
-"DCT2D(shape) -> new DCT2D operator\n\
-\n\
-Calculates the direct DCT of a 2D array/signal. Input and output\n\
-arrays are 2D NumPy arrays of type ``float64``.\n\
-"
+static auto s_dct2d = bob::extension::ClassDoc(
+  BOB_EXT_MODULE_PREFIX ".DCT2D",
+  "Calculates the direct DCT of a 2D array/signal",
+  "Input and output arrays are 2D NumPy arrays of type ``float64``."
+)
+.add_constructor(bob::extension::FunctionDoc(
+  "DCT2D",
+  "Creates a new DCT2D extractor in the given dimensions"
+)
+.add_prototype("height, width", "")
+.add_prototype("other", "")
+.add_parameter("height, width", "int", "The size of the input signal this class will be able to handle")
+.add_parameter("other", ":py:class:`DCT2D`", "The other DCT2D class to copy-construct")
 );
 
-/**
- * Represents either an DCT2D
- */
-typedef struct {
-  PyObject_HEAD
-  bob::sp::DCT2D* cxx;
-} PyBobSpDCT2DObject;
-
-extern PyTypeObject PyBobSpDCT2D_Type; //forward declaration
+PyTypeObject PyBobSpDCT2D_Type = {
+  PyVarObject_HEAD_INIT(0, 0)
+  0
+};
 
 int PyBobSpDCT2D_Check(PyObject* o) {
   return PyObject_IsInstance(o, reinterpret_cast<PyObject*>(&PyBobSpDCT2D_Type));
 }
 
-static void PyBobSpDCT2D_Delete (PyBobSpDCT2DObject* o) {
-
-  delete o->cxx;
-  Py_TYPE(o)->tp_free((PyObject*)o);
-
+static void PyBobSpDCT2D_Delete (PyBobSpDCT2DObject* self) {
+  self->cxx.reset();
+  Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static int PyBobSpDCT2D_InitCopy
-(PyBobSpDCT2DObject* self, PyObject* args, PyObject* kwds) {
+static int PyBobSpDCT2D_InitCopy(PyBobSpDCT2DObject* self, PyObject* args, PyObject* kwds) {
+  char** kwlist = s_dct2d.kwlist(1);
+  PyBobSpDCT2DObject* other;
 
-  /* Parses input arguments in a single shot */
-  static const char* const_kwlist[] = {"other", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!", kwlist, &PyBobSpDCT2D_Type, &other)) return -1;
 
-  PyObject* other = 0;
-
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!", kwlist,
-        &PyBobSpDCT2D_Type, &other)) return -1;
-
-  auto copy = reinterpret_cast<PyBobSpDCT2DObject*>(other);
-
-  try {
-    self->cxx = new bob::sp::DCT2D(*(copy->cxx));
-    if (!self->cxx) {
-      PyErr_Format(PyExc_MemoryError, "cannot create new object of type `%s' - no more memory", Py_TYPE(self)->tp_name);
-      return -1;
-    }
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot create new object of type `%s' - unknown exception thrown", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx.reset(new bob::sp::DCT2D(*(other->cxx)));
   return 0;
-
 }
 
-static int PyBobSpDCT2D_InitShape(PyBobSpDCT2DObject* self, PyObject *args,
-    PyObject* kwds) {
+static int PyBobSpDCT2D_InitShape(PyBobSpDCT2DObject* self, PyObject *args, PyObject* kwds) {
+  char** kwlist = s_dct2d.kwlist(0);
 
-  /* Parses input arguments in a single shot */
-  static const char* const_kwlist[] = {"height", "width", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
-
-  Py_ssize_t h = 0;
-  Py_ssize_t w = 0;
+  Py_ssize_t h;
+  Py_ssize_t w;
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "nn", kwlist, &h, &w)) return -1;
 
-  try {
-    self->cxx = new bob::sp::DCT2D(h, w);
-    if (!self->cxx) {
-      PyErr_Format(PyExc_MemoryError, "cannot create new object of type `%s' - no more memory", Py_TYPE(self)->tp_name);
-      return -1;
-    }
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot create new object of type `%s' - unknown exception thrown", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx.reset(new bob::sp::DCT2D(h, w));
   return 0; ///< SUCCESS
-
 }
 
-static int PyBobSpDCT2D_Init(PyBobSpDCT2DObject* self,
-    PyObject* args, PyObject* kwds) {
-
+static int PyBobSpDCT2D_Init(PyBobSpDCT2DObject* self, PyObject* args, PyObject* kwds) {
+BOB_TRY
   Py_ssize_t nargs = (args?PyTuple_Size(args):0) + (kwds?PyDict_Size(kwds):0);
 
   switch (nargs) {
-
     case 1:
       return PyBobSpDCT2D_InitCopy(self, args, kwds);
 
@@ -122,29 +71,20 @@ static int PyBobSpDCT2D_Init(PyBobSpDCT2DObject* self,
       return PyBobSpDCT2D_InitShape(self, args, kwds);
 
     default:
-
       PyErr_Format(PyExc_RuntimeError, "number of arguments mismatch - %s requires 1 argument, but you provided %" PY_FORMAT_SIZE_T "d (see help)", Py_TYPE(self)->tp_name, nargs);
-
   }
-
   return -1;
-
+BOB_CATCH_MEMBER("constructor", -1)
 }
 
 static PyObject* PyBobSpDCT2D_Repr(PyBobSpDCT2DObject* self) {
-  return
-# if PY_VERSION_HEX >= 0x03000000
-  PyUnicode_FromFormat
-# else
-  PyString_FromFormat
-# endif
-  ("%s(height=%zu, width=%zu)", Py_TYPE(self)->tp_name, self->cxx->getHeight(),
-   self->cxx->getWidth());
+BOB_TRY
+  return PyString_FromFormat("%s(height=%zu, width=%zu)", Py_TYPE(self)->tp_name, self->cxx->getHeight(), self->cxx->getWidth());
+BOB_CATCH_MEMBER("__repr__", 0)
 }
 
-static PyObject* PyBobSpDCT2D_RichCompare (PyBobSpDCT2DObject* self,
-    PyObject* other, int op) {
-
+static PyObject* PyBobSpDCT2D_RichCompare (PyBobSpDCT2DObject* self, PyObject* other, int op) {
+BOB_TRY
   if (!PyBobSpDCT2D_Check(other)) {
     PyErr_Format(PyExc_TypeError, "cannot compare `%s' with `%s'",
         Py_TYPE(self)->tp_name, Py_TYPE(other)->tp_name);
@@ -166,22 +106,22 @@ static PyObject* PyBobSpDCT2D_RichCompare (PyBobSpDCT2DObject* self,
       Py_INCREF(Py_NotImplemented);
       return Py_NotImplemented;
   }
-
+BOB_CATCH_MEMBER("RichCompare", 0)
 }
 
-PyDoc_STRVAR(s_height_str, "height");
-PyDoc_STRVAR(s_height_doc,
-"The height of the output vector\n\
-");
-
-static PyObject* PyBobSpDCT2D_GetHeight
-(PyBobSpDCT2DObject* self, void* /*closure*/) {
+static auto s_height = bob::extension::VariableDoc(
+  "height",
+  "int",
+  "The height of the input and output data"
+);
+static PyObject* PyBobSpDCT2D_GetHeight(PyBobSpDCT2DObject* self, void* /*closure*/) {
+BOB_TRY
   return Py_BuildValue("n", self->cxx->getHeight());
+BOB_CATCH_MEMBER("height", 0)
 }
 
-static int PyBobSpDCT2D_SetHeight
-(PyBobSpDCT2DObject* self, PyObject* o, void* /*closure*/) {
-
+static int PyBobSpDCT2D_SetHeight(PyBobSpDCT2DObject* self, PyObject* o, void* /*closure*/) {
+BOB_TRY
   if (!PyBob_NumberCheck(o)) {
     PyErr_Format(PyExc_TypeError, "`%s' height can only be set using a number, not `%s'", Py_TYPE(self)->tp_name, Py_TYPE(o)->tp_name);
     return -1;
@@ -190,34 +130,26 @@ static int PyBobSpDCT2D_SetHeight
   Py_ssize_t len = PyNumber_AsSsize_t(o, PyExc_OverflowError);
   if (PyErr_Occurred()) return -1;
 
-  try {
-    self->cxx->setHeight(len);
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot reset `height' of %s: unknown exception caught", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx->setHeight(len);
   return 0;
-
+BOB_CATCH_MEMBER("height", -1)
 }
 
-PyDoc_STRVAR(s_width_str, "width");
-PyDoc_STRVAR(s_width_doc,
-"The width of the output vector\n\
-");
-
+static auto s_width = bob::extension::VariableDoc(
+  "width",
+  "int",
+  "The width of the input and output data"
+);
 static PyObject* PyBobSpDCT2D_GetWidth
 (PyBobSpDCT2DObject* self, void* /*closure*/) {
+BOB_TRY
   return Py_BuildValue("n", self->cxx->getWidth());
+BOB_CATCH_MEMBER("width", 0)
 }
 
 static int PyBobSpDCT2D_SetWidth
 (PyBobSpDCT2DObject* self, PyObject* o, void* /*closure*/) {
+BOB_TRY
 
   if (!PyBob_NumberCheck(o)) {
     PyErr_Format(PyExc_TypeError, "`%s' width can only be set using a number, not `%s'", Py_TYPE(self)->tp_name, Py_TYPE(o)->tp_name);
@@ -227,35 +159,24 @@ static int PyBobSpDCT2D_SetWidth
   Py_ssize_t len = PyNumber_AsSsize_t(o, PyExc_OverflowError);
   if (PyErr_Occurred()) return -1;
 
-  try {
-    self->cxx->setWidth(len);
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot reset `width' of %s: unknown exception caught", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx->setWidth(len);
   return 0;
-
+BOB_CATCH_MEMBER("width", -1)
 }
 
-PyDoc_STRVAR(s_shape_str, "shape");
-PyDoc_STRVAR(s_shape_doc,
-"A tuple that represents the size of the output vector\n\
-");
-
-static PyObject* PyBobSpDCT2D_GetShape
-(PyBobSpDCT2DObject* self, void* /*closure*/) {
+static auto s_shape = bob::extension::VariableDoc(
+  "shape",
+  "(int, int)",
+  "A 2D tuple that represents the size of the input/output data"
+);
+static PyObject* PyBobSpDCT2D_GetShape(PyBobSpDCT2DObject* self, void* /*closure*/) {
+BOB_TRY
   return Py_BuildValue("(nn)", self->cxx->getHeight(), self->cxx->getWidth());
+BOB_CATCH_MEMBER("shape", 0)
 }
 
-static int PyBobSpDCT2D_SetShape
-(PyBobSpDCT2DObject* self, PyObject* o, void* /*closure*/) {
-
+static int PyBobSpDCT2D_SetShape(PyBobSpDCT2DObject* self, PyObject* o, void* /*closure*/) {
+BOB_TRY
   if (!PySequence_Check(o)) {
     PyErr_Format(PyExc_TypeError, "`%s' shape can only be set using tuples (or sequences), not `%s'", Py_TYPE(self)->tp_name, Py_TYPE(o)->tp_name);
     return -1;
@@ -274,55 +195,53 @@ static int PyBobSpDCT2D_SetShape
   Py_ssize_t w = PyNumber_AsSsize_t(PyTuple_GET_ITEM(shape, 1), PyExc_OverflowError);
   if (PyErr_Occurred()) return -1;
 
-  try {
-    self->cxx->setHeight(h);
-    self->cxx->setWidth(w);
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot reset `shape' of %s: unknown exception caught", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx->setHeight(h);
+  self->cxx->setWidth(w);
   return 0;
-
+BOB_CATCH_MEMBER("shape", -1)
 }
 
 static PyGetSetDef PyBobSpDCT2D_getseters[] = {
     {
-      s_height_str,
+      s_height.name(),
       (getter)PyBobSpDCT2D_GetHeight,
       (setter)PyBobSpDCT2D_SetHeight,
-      s_height_doc,
+      s_height.doc(),
       0
     },
     {
-      s_width_str,
+      s_width.name(),
       (getter)PyBobSpDCT2D_GetWidth,
       (setter)PyBobSpDCT2D_SetWidth,
-      s_width_doc,
+      s_width.doc(),
       0
     },
     {
-      s_shape_str,
+      s_shape.name(),
       (getter)PyBobSpDCT2D_GetShape,
       (setter)PyBobSpDCT2D_SetShape,
-      s_shape_doc,
+      s_shape.doc(),
       0
     },
     {0}  /* Sentinel */
 };
 
-static PyObject* PyBobSpDCT2D_Call
-(PyBobSpDCT2DObject* self, PyObject* args, PyObject* kwds) {
+static auto s_transform = bob::extension::FunctionDoc(
+  "transform",
+  "Calculates the direct DCT of the given signal",
+  ".. note:: The :py:meth:`__call__` function is a synonym for this function.",
+  true
+)
+.add_prototype("input, [output]", "output")
+.add_parameter("input", "array_like(2D, float)", "The given input array. It must be of shape :py:attr:`shape`")
+.add_parameter("output", "array_like(2D, float)", "A pre-allocated output array. If given, it must be of shape :py:attr:`shape`")
+.add_return("output", "array_like(2D, float)", "The DCT result; identical to the ``output`` parameter, if given")
+;
+static PyObject* PyBobSpDCT2D_transform(PyBobSpDCT2DObject* self, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_transform.kwlist();
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
-
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -366,68 +285,45 @@ static PyObject* PyBobSpDCT2D_Call
 
   /** if ``output`` was not pre-allocated, do it now **/
   if (!output) {
-    Py_ssize_t size[2];
-    size[0] = self->cxx->getHeight();
-    size[1] = self->cxx->getWidth();
+    Py_ssize_t size[2] = {static_cast<Py_ssize_t>(self->cxx->getHeight()), static_cast<Py_ssize_t>(self->cxx->getWidth())};
     output = (PyBlitzArrayObject*)PyBlitzArray_SimpleNew(NPY_FLOAT64, 2, size);
     output_ = make_safe(output);
   }
 
   /** all basic checks are done, can call the operator now **/
-  try {
-    self->cxx->operator()(*PyBlitzArrayCxx_AsBlitz<double,2>(input),
-        *PyBlitzArrayCxx_AsBlitz<double,2>(output));
-  }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "%s cannot operate on data: unknown exception caught", Py_TYPE(self)->tp_name);
-    return 0;
-  }
+  self->cxx->operator()(*PyBlitzArrayCxx_AsBlitz<double,2>(input), *PyBlitzArrayCxx_AsBlitz<double,2>(output));
 
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_MEMBER("transform", 0)
 }
 
-PyTypeObject PyBobSpDCT2D_Type = {
-    PyVarObject_HEAD_INIT(0, 0)
-    s_fft2d_str,                              /*tp_name*/
-    sizeof(PyBobSpDCT2DObject),               /*tp_basicsize*/
-    0,                                        /*tp_itemsize*/
-    (destructor)PyBobSpDCT2D_Delete,          /*tp_dealloc*/
-    0,                                        /*tp_print*/
-    0,                                        /*tp_getattr*/
-    0,                                        /*tp_setattr*/
-    0,                                        /*tp_compare*/
-    (reprfunc)PyBobSpDCT2D_Repr,              /*tp_repr*/
-    0,                                        /*tp_as_number*/
-    0,                                        /*tp_as_sequence*/
-    0,                                        /*tp_as_mapping*/
-    0,                                        /*tp_hash */
-    (ternaryfunc)PyBobSpDCT2D_Call,           /* tp_call */
-    (reprfunc)PyBobSpDCT2D_Repr,              /*tp_str*/
-    0,                                        /*tp_getattro*/
-    0,                                        /*tp_setattro*/
-    0,                                        /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-    s_fft2d_doc,                              /* tp_doc */
-    0,		                                    /* tp_traverse */
-    0,		                                    /* tp_clear */
-    (richcmpfunc)PyBobSpDCT2D_RichCompare,    /* tp_richcompare */
-    0,		                                    /* tp_weaklistoffset */
-    0,		                                    /* tp_iter */
-    0,		                                    /* tp_iternext */
-    0,                                        /* tp_methods */
-    0,                                        /* tp_members */
-    PyBobSpDCT2D_getseters,                   /* tp_getset */
-    0,                                        /* tp_base */
-    0,                                        /* tp_dict */
-    0,                                        /* tp_descr_get */
-    0,                                        /* tp_descr_set */
-    0,                                        /* tp_dictoffset */
-    (initproc)PyBobSpDCT2D_Init,              /* tp_init */
-    0,                                        /* tp_alloc */
-    0,                                        /* tp_new */
+static PyMethodDef PyBobSpDCT2D_methods[] = {
+    {
+      s_transform.name(),
+      (PyCFunction)PyBobSpDCT2D_transform,
+      METH_VARARGS|METH_KEYWORDS,
+      s_transform.doc()
+    },
+    {0}  /* Sentinel */
 };
+
+bool init_BobSpDCT2D(PyObject* module){
+  // class definition
+  PyBobSpDCT2D_Type.tp_name = s_dct2d.name();
+  PyBobSpDCT2D_Type.tp_basicsize = sizeof(PyBobSpDCT2DObject);
+  PyBobSpDCT2D_Type.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  PyBobSpDCT2D_Type.tp_doc = s_dct2d.doc();
+
+  PyBobSpDCT2D_Type.tp_new = PyType_GenericNew;
+  PyBobSpDCT2D_Type.tp_dealloc = reinterpret_cast<destructor>(PyBobSpDCT2D_Delete);
+  PyBobSpDCT2D_Type.tp_init = reinterpret_cast<initproc>(PyBobSpDCT2D_Init);
+  PyBobSpDCT2D_Type.tp_richcompare = reinterpret_cast<richcmpfunc>(PyBobSpDCT2D_RichCompare);
+  PyBobSpDCT2D_Type.tp_methods = PyBobSpDCT2D_methods;
+  PyBobSpDCT2D_Type.tp_getset = PyBobSpDCT2D_getseters;
+  PyBobSpDCT2D_Type.tp_call = reinterpret_cast<ternaryfunc>(PyBobSpDCT2D_transform);
+  PyBobSpDCT2D_Type.tp_repr = reinterpret_cast<reprfunc>(PyBobSpDCT2D_Repr);
+
+  // check that everything is fine
+  if (PyType_Ready(&PyBobSpDCT2D_Type) < 0) return false;
+  return PyModule_AddObject(module, "DCT2D", Py_BuildValue("O", &PyBobSpDCT2D_Type)) >= 0;
+}
