@@ -8,7 +8,6 @@
 #include "main.h"
 
 static PyBlitzArrayObject* check_and_allocate(PyBlitzArrayObject* input, PyBlitzArrayObject* output) {
-
   if (input->type_num != NPY_FLOAT64) {
     PyErr_SetString(PyExc_TypeError, "method only supports 64-bit float arrays for input array `input'");
     return 0;
@@ -62,7 +61,7 @@ bob::extension::FunctionDoc s_dct = bob::extension::FunctionDoc(
 .add_prototype("src, [dst]", "dst")
 .add_parameter("src", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` for which the DCT operation will be performed")
 .add_parameter("dst", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
-.add_return("dst", "array_like(1D or 2D, float)", "The 1 or 2-dimensional array of type ``float64`` of the same dimension as ``src`` and of type ``float64``, containing the DCT of the ``src`` input signal")
+.add_return("dst", "array_like(1D or 2D, float)", "The 1 or 2-dimensional array of type ``float64`` of the same dimension as ``src``, containing the DCT of the ``src`` input signal")
 ;
 PyObject* PyBobSpDCT(PyObject*, PyObject* args, PyObject* kwds) {
 BOB_TRY
@@ -101,13 +100,13 @@ BOB_CATCH_FUNCTION("dct", 0)
 
 bob::extension::FunctionDoc s_idct = bob::extension::FunctionDoc(
   "idct",
-  "Computes the inverse Discrete Cosinte Transform of a 1D or 2D array/signal of type ``float64``",
+  "Computes the inverse Discrete Cosine Transform of a 1D or 2D array/signal of type ``float64``",
   "Allocates a new output array if ``dst`` is not provided. If it is, then it must be of the same type and shape as ``src``."
 )
 .add_prototype("src, [dst]", "dst")
 .add_parameter("src", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` for which the inverse DCT operation will be performed")
 .add_parameter("dst", "array_like(1D or 2D, float)", "A 1 or 2-dimensional array of type ``float64`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
-.add_return("dst", "array_like(1D or 2D, float)", "The 1 or 2-dimensional array of type ``float64`` of the same dimension as ``src`` and of type ``float64``, containing the inverse DCT of the ``src`` input signal")
+.add_return("dst", "array_like(1D or 2D, float)", "The 1 or 2-dimensional array of type ``float64`` of the same dimension as ``src``, containing the inverse DCT of the ``src`` input signal")
 ;
 PyObject* PyBobSpIDCT(PyObject*, PyObject* args, PyObject* kwds) {
 BOB_TRY

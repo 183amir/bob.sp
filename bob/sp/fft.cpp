@@ -5,15 +5,11 @@
  * @brief Methods for quick FFT/IFFT calculation
  */
 
-#include <bob.blitz/cppapi.h>
-#include <bob.blitz/cleanup.h>
-#include <bob.sp/FFT1D.h>
-#include <bob.sp/FFT2D.h>
+#include "main.h"
+
 #include <bob.sp/fftshift.h>
 
-static int check_and_allocate(boost::shared_ptr<PyBlitzArrayObject>& input,
-    boost::shared_ptr<PyBlitzArrayObject>& output) {
-
+static PyBlitzArrayObject* check_and_allocate(PyBlitzArrayObject* input, PyBlitzArrayObject* output) {
   if (input->type_num != NPY_COMPLEX128) {
     PyErr_SetString(PyExc_TypeError, "method only supports 128-bit complex (2x64-bit float) arrays for input array `input'");
     return 0;
@@ -35,7 +31,6 @@ static int check_and_allocate(boost::shared_ptr<PyBlitzArrayObject>& input,
   }
 
   if (output) {
-
     if (input->ndim == 1) {
       if (output->shape[0] != input->shape[0]) {
         PyErr_Format(PyExc_RuntimeError, "1D `output' array should have %" PY_FORMAT_SIZE_T "d elements matching output size, not %" PY_FORMAT_SIZE_T "d elements", input->shape[0], output->shape[0]);
@@ -52,26 +47,30 @@ static int check_and_allocate(boost::shared_ptr<PyBlitzArrayObject>& input,
         return 0;
       }
     }
+    Py_INCREF(output);
+  } else {
+    output = (PyBlitzArrayObject*)PyBlitzArray_SimpleNew(NPY_COMPLEX128, input->ndim, input->shape);
   }
 
-  else {
-
-    auto tmp = (PyBlitzArrayObject*)PyBlitzArray_SimpleNew(NPY_COMPLEX128, input->ndim, input->shape);
-    if (!tmp) return 0;
-    output = make_safe(tmp);
-
-  }
-
-  return 1;
-
+  return output;
 }
 
-PyObject* fft(PyObject*, PyObject* args, PyObject* kwds) {
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+bob::extension::FunctionDoc s_fft = bob::extension::FunctionDoc(
+  "fft",
+  "Computes the direct Fast Fourier Transform of a 1D or 2D array/signal of type ``complex128``",
+  "Allocates a new output array if ``dst`` is not provided. If it is, then it must be of the same type and shape as ``src``."
+)
+.add_prototype("src, [dst]", "dst")
+.add_parameter("src", "array_like(1D or 2D, complex)", "A 1 or 2-dimensional array of type ``complex128`` for which the FFT operation will be performed")
+.add_parameter("dst", "array_like(1D or 2D, complex)", "A 1 or 2-dimensional array of type ``complex128`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
+.add_return("dst", "array_like(1D or 2D, complex)", "The 1 or 2-dimensional array of type ``complex128`` of the same dimension as ``src``, containing the FFT of the ``src`` input signal")
+;
+PyObject* PyBobSpFFT(PyObject*, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_fft.kwlist();
 
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -83,46 +82,38 @@ PyObject* fft(PyObject*, PyObject* args, PyObject* kwds) {
   auto input_ = make_safe(input);
   auto output_ = make_xsafe(output);
 
-  if (!check_and_allocate(input_, output_))
-    return 0;
-
-  output = output_.get();
+  output = check_and_allocate(input, output);
+  if (!output) return 0;
+  output_ = make_safe(output);
 
   /** all basic checks are done, can call the operator now **/
-  try {
-
-    if (input->ndim == 1) {
-      bob::sp::FFT1D op(input->shape[0]);
-      op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output));
-    }
-
-    else { // input->ndim == 2
-      bob::sp::FFT2D op(input->shape[0], input->shape[1]);
-      op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output));
-    }
-
+  if (input->ndim == 1) {
+    bob::sp::FFT1D op(input->shape[0]);
+    op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input), *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output));
+  } else { // input->ndim == 2
+    bob::sp::FFT2D op(input->shape[0], input->shape[1]);
+    op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input), *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output));
   }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_SetString(PyExc_RuntimeError, "cannot operate on data: unknown exception caught");
-    return 0;
-  }
-
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_FUNCTION("fft", 0)
 }
 
-PyObject* ifft(PyObject*, PyObject* args, PyObject* kwds) {
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+bob::extension::FunctionDoc s_ifft = bob::extension::FunctionDoc(
+  "ifft",
+  "Computes the inverse Fast Fourier Transform of a 1D or 2D array/signal of type ``complex128``",
+  "Allocates a new output array if ``dst`` is not provided. If it is, then it must be of the same type and shape as ``src``."
+)
+.add_prototype("src, [dst]", "dst")
+.add_parameter("src", "array_like(1D or 2D, complex)", "A 1 or 2-dimensional array of type ``complex128`` for which the inverse DCT operation will be performed")
+.add_parameter("dst", "array_like(1D or 2D, complex)", "A 1 or 2-dimensional array of type ``complex128`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
+.add_return("dst", "array_like(1D or 2D, complex)", "The 1 or 2-dimensional array of type ``complex128`` of the same dimension as ``src``, containing the inverse FFT of the ``src`` input signal")
+;
+PyObject* PyBobSpIFFT(PyObject*, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_ifft.kwlist();
 
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -134,46 +125,41 @@ PyObject* ifft(PyObject*, PyObject* args, PyObject* kwds) {
   auto input_ = make_safe(input);
   auto output_ = make_xsafe(output);
 
-  if (!check_and_allocate(input_, output_))
-    return 0;
-
-  output = output_.get();
+  output = check_and_allocate(input, output);
+  if (!output) return 0;
+  output_ = make_safe(output);
 
   /** all basic checks are done, can call the operator now **/
-  try {
-
-    if (input->ndim == 1) {
-      bob::sp::IFFT1D op(input->shape[0]);
-      op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output));
-    }
-
-    else { // input->ndim == 2
-      bob::sp::IFFT2D op(input->shape[0], input->shape[1]);
-      op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output));
-    }
-
-  }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_SetString(PyExc_RuntimeError, "cannot operate on data: unknown exception caught");
-    return 0;
+  if (input->ndim == 1) {
+    bob::sp::IFFT1D op(input->shape[0]);
+    op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input), *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output));
   }
 
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  else { // input->ndim == 2
+    bob::sp::IFFT2D op(input->shape[0], input->shape[1]);
+    op(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input),*PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output));
+  }
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_FUNCTION("ifft", 0)
 }
 
-PyObject* fftshift(PyObject*, PyObject* args, PyObject* kwds) {
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+bob::extension::FunctionDoc s_fftshift = bob::extension::FunctionDoc(
+  "fftshift",
+  "Shifts the given data such that the center of the data is centered at zero for FFT, as required by the FFT",
+  "If a 1D ``complex128`` array is passed, inverses the two halves of that array and returns the result as a new array. "
+  "If a 2D ``complex128`` array is passed, swaps the four quadrants of the array and returns the result as a new array."
+)
+.add_prototype("src, [dst]", "dst")
+.add_parameter("src", "array_like(1D or 2D, complex)", "A 1 or 2-dimensional array of type ``complex128`` to be shifted")
+.add_parameter("dst", "array_like(1D or 2D, complex)", "A  pre-allocated 1 or 2-dimensional array of type ``complex128`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
+.add_return("dst", "array_like(1D or 2D, complex)", "The 1 or 2-dimensional array of type ``complex128`` of the same dimension as ``src``, containing the shifted version of ``src``")
+;
+PyObject* PyBobSpFFTShift(PyObject*, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_fftshift.kwlist();
 
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -185,48 +171,44 @@ PyObject* fftshift(PyObject*, PyObject* args, PyObject* kwds) {
   auto input_ = make_safe(input);
   auto output_ = make_xsafe(output);
 
-  if (!check_and_allocate(input_, output_))
-    return 0;
-
-  output = output_.get();
+  output = check_and_allocate(input, output);
+  if (!output) return 0;
+  output_ = make_safe(output);
 
   /** all basic checks are done, can call the operator now **/
-  try {
-
-    if (input->ndim == 1) {
-      bob::sp::fftshift(
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output)
-          );
-    }
-
-    else { // input->ndim == 2
-      bob::sp::fftshift(
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output)
-          );
-    }
-
-  }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_SetString(PyExc_RuntimeError, "cannot operate on data: unknown exception caught");
-    return 0;
+  if (input->ndim == 1) {
+    bob::sp::fftshift(
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input),
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output)
+        );
   }
 
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  else { // input->ndim == 2
+    bob::sp::fftshift(
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input),
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output)
+        );
+  }
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_FUNCTION("fftshift", 0)
 }
 
-PyObject* ifftshift(PyObject*, PyObject* args, PyObject* kwds) {
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+bob::extension::FunctionDoc s_ifftshift = bob::extension::FunctionDoc(
+  "ifftshift",
+  "This method undoes what :py:meth:`fftshift` does",
+  "It accepts 1 or 2-dimensional arrays of type ``complex128``"
+)
+.add_prototype("src, [dst]", "dst")
+.add_parameter("src", "array_like(1D or 2D, complex)", "A 1 or 2-dimensional array of type ``complex128`` to be shifted back")
+.add_parameter("dst", "array_like(1D or 2D, complex)", "A  pre-allocated 1 or 2-dimensional array of type ``complex128`` and matching dimensions to ``src`` in  which the result of the operation will be stored")
+.add_return("dst", "array_like(1D or 2D, complex)", "The 1 or 2-dimensional array of type ``complex128`` of the same dimension as ``src``, containing the back-shifted version of ``src``")
+;
+PyObject* PyBobSpIFFTShift(PyObject*, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_ifftshift.kwlist();
 
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -238,38 +220,24 @@ PyObject* ifftshift(PyObject*, PyObject* args, PyObject* kwds) {
   auto input_ = make_safe(input);
   auto output_ = make_xsafe(output);
 
-  if (!check_and_allocate(input_, output_))
-    return 0;
-
-  output = output_.get();
+  output = check_and_allocate(input, output);
+  if (!output) return 0;
+  output_ = make_safe(output);
 
   /** all basic checks are done, can call the operator now **/
-  try {
-
-    if (input->ndim == 1) {
-      bob::sp::ifftshift(
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output)
-          );
-    }
-
-    else { // input->ndim == 2
-      bob::sp::ifftshift(
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input),
-          *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output)
-          );
-    }
-
-  }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_SetString(PyExc_RuntimeError, "cannot operate on data: unknown exception caught");
-    return 0;
+  if (input->ndim == 1) {
+    bob::sp::ifftshift(
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input),
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output)
+        );
   }
 
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  else { // input->ndim == 2
+    bob::sp::ifftshift(
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(input),
+        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,2>(output)
+        );
+  }
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_FUNCTION("fftshift", 0)
 }

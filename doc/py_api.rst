@@ -18,6 +18,8 @@ Fast Fourier Transform
 .. autosummary::
    bob.sp.fft
    bob.sp.ifft
+   bob.sp.fftshift
+   bob.sp.ifftshift
    bob.sp.FFT1D
    bob.sp.IFFT1D
    bob.sp.FFT2D
@@ -34,6 +36,25 @@ Discrete Cosine Transform
    bob.sp.IDCT1D
    bob.sp.DCT2D
    bob.sp.IDCT1D
+
+
+Extrapolation
+-------------
+
+.. autosummary::
+   bob.sp.BorderType
+   bob.sp.extrapolate
+   bob.sp.extrapolate_zero
+   bob.sp.extrapolate_constant
+   bob.sp.extrapolate_nearest
+   bob.sp.extrapolate_mirror
+   bob.sp.extrapolate_circular
+
+Quantization
+------------
+
+.. autosummary::
+   bob.sp.Quantization
 
 Details
 .......

@@ -8,33 +8,29 @@
  * Copyright (C) 2011-2014 Idiap Research Institute, Martigny, Switzerland
  */
 
-#include <bob.blitz/cppapi.h>
-#include <bob.blitz/cleanup.h>
-#include <bob.sp/extrapolate.h>
+#include "main.h"
 
-PyDoc_STRVAR(s_border_str, BOB_EXT_MODULE_PREFIX ".BorderType");
-
-PyDoc_STRVAR(s_border_doc,
-"BorderType (C++ enumeration) - cannot be instantiated from Python\n\
-\n\
-Use of the values available in this class as input for ``BorderType``\n\
-when required:\n\
-\n\
-  * Zero\n\
-  * Constant\n\
-  * NearestNeighbour\n\
-  * Circular\n\
-  * Mirror\n\
-\n\
-A dictionary containing all names and values available for this\n\
-enumeration is available through the attribute ``entries``.\n\
-"
+static auto s_bordertype = bob::extension::ClassDoc(
+  BOB_EXT_MODULE_PREFIX ".BorderType",
+  "An enumeration to define different types of border handling in extrapolations (and other functions)",
+  "This class is just a representation of the BorderType C++ ``enum`` for Python. "
+  "This class cannot be instantiated in Python. "
+  "Instead, Use of the values available in this class as input for ``BorderType`` when required:\n\n"
+  "* Zero : Fills the border with 0 (a special version of ``Constant``)\n"
+  "* Constant : Fills the border with a given constant value\n"
+  "* NearestNeighbour : Fills the border with the nearest neighbor from the inside\n"
+  "* Circular : Fills the border by copying data from the other side of the array\n"
+  "* Mirror : Fills the border by copying data from the inside in a mirroring way\n\n"
+  "A dictionary containing all names and values available for this enumeration is available through :py:attr:`entries`."
 );
 
-extern PyTypeObject PyBobSpExtrapolationBorder_Type; ///< forward
+PyTypeObject PyBobSpExtrapolationBorder_Type = {
+    PyVarObject_HEAD_INIT(0, 0)
+    0
+};
 
-static int insert_item_string(PyObject* dict, PyObject* entries,
-    const char* key, Py_ssize_t value) {
+static int insert(PyObject* dict, PyObject* entries, const char* key, Py_ssize_t value) {
+  // inserts the item to both the dictionary and the entries dictionary
   auto v = make_safe(Py_BuildValue("n", value));
   if (PyDict_SetItemString(dict, key, v.get()) < 0) return -1;
   return PyDict_SetItemString(entries, key, v.get());
@@ -49,148 +45,127 @@ static PyObject* create_enumerations() {
   if (!entries) return 0;
   auto entries_ = make_safe(entries);
 
-  if (insert_item_string(retval, entries, "Zero",
-        bob::sp::Extrapolation::BorderType::Zero) < 0) return 0;
-  if (insert_item_string(retval, entries, "Constant",
-        bob::sp::Extrapolation::BorderType::Constant) < 0) return 0;
-  if (insert_item_string(retval, entries, "NearestNeighbour",
-        bob::sp::Extrapolation::BorderType::NearestNeighbour) < 0) return 0;
-  if (insert_item_string(retval, entries, "Circular",
-        bob::sp::Extrapolation::BorderType::Circular) < 0) return 0;
-  if (insert_item_string(retval, entries, "Mirror",
-        bob::sp::Extrapolation::BorderType::Mirror) < 0) return 0;
+  if (insert(retval, entries, "Zero", bob::sp::Extrapolation::BorderType::Zero) < 0) return 0;
+  if (insert(retval, entries, "Constant", bob::sp::Extrapolation::BorderType::Constant) < 0) return 0;
+  if (insert(retval, entries, "NearestNeighbour", bob::sp::Extrapolation::BorderType::NearestNeighbour) < 0) return 0;
+  if (insert(retval, entries, "Circular", bob::sp::Extrapolation::BorderType::Circular) < 0) return 0;
+  if (insert(retval, entries, "Mirror", bob::sp::Extrapolation::BorderType::Mirror) < 0) return 0;
 
   if (PyDict_SetItemString(retval, "entries", entries) < 0) return 0;
 
   return Py_BuildValue("O", retval);
 }
 
-int PyBobSpExtrapolationBorder_Converter(PyObject* o,
-    bob::sp::Extrapolation::BorderType* b) {
+int PyBobSpExtrapolationBorder_Converter(PyObject* o, bob::sp::Extrapolation::BorderType* b) {
+  if (!o) return 0;
 
-  Py_ssize_t v = PyNumber_AsSsize_t(o, PyExc_OverflowError);
-  if (v == -1 && PyErr_Occurred()) return 0;
-  bob::sp::Extrapolation::BorderType value =
-    (bob::sp::Extrapolation::BorderType)v;
+  if (PyInt_Check(o)){
+    Py_ssize_t v = PyNumber_AsSsize_t(o, PyExc_OverflowError);
+    if (v == -1 && PyErr_Occurred()) return 0;
+    switch (v) {
+      case bob::sp::Extrapolation::BorderType::Zero:
+      case bob::sp::Extrapolation::BorderType::Constant:
+      case bob::sp::Extrapolation::BorderType::NearestNeighbour:
+      case bob::sp::Extrapolation::BorderType::Circular:
+      case bob::sp::Extrapolation::BorderType::Mirror:
+        *b = static_cast<bob::sp::Extrapolation::BorderType>(v);
+        return 1;
+      default:
+        PyErr_Format(PyExc_ValueError, "border parameter must be set to one of the integer values defined in `%s'", PyBobSpExtrapolationBorder_Type.tp_name);
+        return 0;
+    }
+  } else {
+    const std::string str = PyString_AsString(o);
+    if (PyErr_Occurred()){
+      PyErr_Format(PyExc_ValueError, "border parameter must be set to one of the integer values defined in `%s', or a string representation of it", PyBobSpExtrapolationBorder_Type.tp_name);
+      return 0;
+    }
 
-  switch (value) {
-    case bob::sp::Extrapolation::BorderType::Zero:
-    case bob::sp::Extrapolation::BorderType::Constant:
-    case bob::sp::Extrapolation::BorderType::NearestNeighbour:
-    case bob::sp::Extrapolation::BorderType::Circular:
-    case bob::sp::Extrapolation::BorderType::Mirror:
-      *b = value;
-      return 1;
-    default:
-      PyErr_Format(PyExc_ValueError, "border parameter must be set to one of the integer values defined in `%s'", PyBobSpExtrapolationBorder_Type.tp_name);
+    if (str == "Zero") *b = bob::sp::Extrapolation::BorderType::Zero;
+    else if (str == "Constant") *b = bob::sp::Extrapolation::BorderType::Constant;
+    else if (str == "NearestNeighbour") *b = bob::sp::Extrapolation::BorderType::NearestNeighbour;
+    else if (str == "Circular") *b = bob::sp::Extrapolation::BorderType::Circular;
+    else if (str == "Mirror") *b = bob::sp::Extrapolation::BorderType::Mirror;
+    else {
+      PyErr_Format(PyExc_ValueError, "border parameter must be set to one of the integer values defined in `%s', or a string representation of it", PyBobSpExtrapolationBorder_Type.tp_name);
+      return 0;
+    }
+    return 1;
   }
-
-  return 0;
-
 }
 
 static int PyBobSpExtrapolationBorder_Init(PyObject* self, PyObject*, PyObject*) {
-
+  // Avoid instantiation of this class
   PyErr_Format(PyExc_NotImplementedError, "cannot initialize C++ enumeration bindings `%s' - use one of the class' attached attributes instead", Py_TYPE(self)->tp_name);
   return -1;
-
 }
 
-PyTypeObject PyBobSpExtrapolationBorder_Type = {
-    PyVarObject_HEAD_INIT(0, 0)
-    s_border_str,                             /* tp_name */
-    sizeof(PyBobSpExtrapolationBorder_Type),  /* tp_basicsize */
-    0,                                        /* tp_itemsize */
-    0,                                        /* tp_dealloc */
-    0,                                        /* tp_print */
-    0,                                        /* tp_getattr */
-    0,                                        /* tp_setattr */
-    0,                                        /* tp_compare */
-    0,                                        /* tp_repr */
-    0,                                        /* tp_as_number */
-    0,                                        /* tp_as_sequence */
-    0,                                        /* tp_as_mapping */
-    0,                                        /* tp_hash */
-    0,                                        /* tp_call */
-    0,                                        /* tp_str*/
-    0,                                        /* tp_getattro*/
-    0,                                        /* tp_setattro*/
-    0,                                        /* tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags*/
-    s_border_doc,                             /* tp_doc */
-    0,		                                    /* tp_traverse */
-    0,		                                    /* tp_clear */
-    0,                                        /* tp_richcompare */
-    0,		                                    /* tp_weaklistoffset */
-    0,		                                    /* tp_iter */
-    0,		                                    /* tp_iternext */
-    0,                                        /* tp_methods */
-    0,                                        /* tp_members */
-    0,                                        /* tp_getset */
-    0,                                        /* tp_base */
-    create_enumerations(),                    /* tp_dict */
-    0,                                        /* tp_descr_get */
-    0,                                        /* tp_descr_set */
-    0,                                        /* tp_dictoffset */
-    PyBobSpExtrapolationBorder_Init,          /* tp_init */
-    0,                                        /* tp_alloc */
-    0,                                        /* tp_new */
-};
 
+bool init_BobSpBorderType(PyObject* module){
+
+  PyBobSpExtrapolationBorder_Type.tp_name = s_bordertype.name();
+  PyBobSpExtrapolationBorder_Type.tp_basicsize = sizeof(PyBobSpExtrapolationBorder_Type);
+  PyBobSpExtrapolationBorder_Type.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  PyBobSpExtrapolationBorder_Type.tp_doc = s_bordertype.doc();
+
+  PyBobSpExtrapolationBorder_Type.tp_init = reinterpret_cast<initproc>(PyBobSpExtrapolationBorder_Init);
+  PyBobSpExtrapolationBorder_Type.tp_dict = create_enumerations();
+
+  // check that everything is fine
+  if (PyType_Ready(&PyBobSpExtrapolationBorder_Type) < 0) return false;
+  return PyModule_AddObject(module, "BorderType", Py_BuildValue("O", &PyBobSpExtrapolationBorder_Type)) >= 0;
+}
+
+
+bob::extension::FunctionDoc s_extrapolate = bob::extension::FunctionDoc(
+  "extrapolate",
+  "Extrapolates values in the given array using the specified border type",
+  "This function extrapolates the given ``src`` array to the given ``dst`` array. "
+  "The ``dst`` array needs to be at least as large as ``src``. "
+  "First, the offset position is estimated and the ``src`` array is copied into the center of the ``dst`` array. "
+  "Afterward, the remaining parts of the array is filled using the desired border handling, see :py:class:`BorderType` for details.\n\n"
+  "This function works for 1D or 2D arrays. "
+  "The parameter ``value`` is only used if the border type is set to :py:attr:`BorderType.Zero`. "
+  "It is, by default, set to ``0.``, or the equivalent on the datatype passed as input. "
+  "For example, ``False``, if the input is boolean and 0+0j, if it is complex."
+)
+.add_prototype("src, dst, [border], [value]")
+.add_parameter("src", "array_like(1D or 2D)", "The input array that should be extrapolated")
+.add_parameter("dst", "array_like(1D or 2D)", "The output array to write the result into; must be at least as large as ``src``")
+.add_parameter("border", ":py:class:`BorderType` or str", "[Default: :py:attr:`BorderType.Zero`] The desired border handling")
+.add_parameter("value", "same data type as in ``src``", "[Default: 0] The desired constant; only used for :py:attr:`BorderType.Constant`")
+;
 template <typename T> PyObject* inner_extrapolate (PyBlitzArrayObject* src,
     PyBlitzArrayObject* dst, bob::sp::Extrapolation::BorderType& border,
     PyObject* value) {
 
   //converts value into a proper scalar
-  T c_value = 0;
+  T c_value = static_cast<T>(0);
   if (value) {
     c_value = PyBlitzArrayCxx_AsCScalar<T>(value);
     if (PyErr_Occurred()) return 0;
   }
 
-  try {
-    switch (src->ndim) {
-      case 1:
-        bob::sp::extrapolate(*PyBlitzArrayCxx_AsBlitz<T,1>(src),
-            *PyBlitzArrayCxx_AsBlitz<T,1>(dst), border, c_value);
-        break;
-      case 2:
-        bob::sp::extrapolate(*PyBlitzArrayCxx_AsBlitz<T,2>(src),
-            *PyBlitzArrayCxx_AsBlitz<T,2>(dst), border, c_value);
-        break;
-      default:
-        PyErr_Format(PyExc_TypeError, "extrapolation does not support arrays with %" PY_FORMAT_SIZE_T "d dimensions", src->ndim);
-        return 0;
-    }
+  switch (src->ndim) {
+    case 1:
+      bob::sp::extrapolate(*PyBlitzArrayCxx_AsBlitz<T,1>(src), *PyBlitzArrayCxx_AsBlitz<T,1>(dst), border, c_value);
+      break;
+    case 2:
+      bob::sp::extrapolate(*PyBlitzArrayCxx_AsBlitz<T,2>(src), *PyBlitzArrayCxx_AsBlitz<T,2>(dst), border, c_value);
+      break;
+    default:
+      PyErr_Format(PyExc_TypeError, "extrapolation does not support arrays with %" PY_FORMAT_SIZE_T "d dimensions", src->ndim);
+      return 0;
   }
-  catch (std::exception& e) {
-    PyErr_Format(PyExc_RuntimeError, "%s", e.what());
-    return 0;
-  }
-
-  catch (...) {
-    PyErr_SetString(PyExc_RuntimeError, "caught unknown exception while calling C++ bob::spp::extrapolate");
-    return 0;
-  }
-
   Py_RETURN_NONE;
-
 }
 
-PyObject* extrapolate(PyObject*, PyObject* args, PyObject* kwds) {
+PyObject* PyBobSpExtrapolate(PyObject*, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_extrapolate.kwlist();
 
-  /* Parses input arguments in a single shot */
-  static const char* const_kwlist[] = {
-    "src",
-    "dst",
-    "border",
-    "value",
-    0 /* Sentinel */
-  };
-  static char** kwlist = const_cast<char**>(const_kwlist);
-
-  PyBlitzArrayObject* src = 0;
-  PyBlitzArrayObject* dst = 0;
+  PyBlitzArrayObject* src;
+  PyBlitzArrayObject* dst;
   bob::sp::Extrapolation::BorderType border = bob::sp::Extrapolation::Zero;
   PyObject* value = 0;
 
@@ -200,6 +175,7 @@ PyObject* extrapolate(PyObject*, PyObject* args, PyObject* kwds) {
         &PyBlitzArray_OutputConverter, &dst,
         &PyBobSpExtrapolationBorder_Converter, &border,
         &value)) return 0;
+
   auto src_ = make_safe(src);
   auto dst_ = make_safe(dst);
 
@@ -250,7 +226,6 @@ PyObject* extrapolate(PyObject*, PyObject* args, PyObject* kwds) {
     default:
       PyErr_Format(PyExc_TypeError, "extrapolation from `%s' (%d) is not supported", PyBlitzArray_TypenumAsString(src->type_num), src->type_num);
   }
-
   return 0;
-
+BOB_CATCH_FUNCTION("extrapolate", 0)
 }

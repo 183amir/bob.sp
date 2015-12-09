@@ -140,17 +140,14 @@ static auto s_width = bob::extension::VariableDoc(
   "int",
   "The width of the input and output data"
 );
-static PyObject* PyBobSpDCT2D_GetWidth
-(PyBobSpDCT2DObject* self, void* /*closure*/) {
+static PyObject* PyBobSpDCT2D_GetWidth(PyBobSpDCT2DObject* self, void* /*closure*/) {
 BOB_TRY
   return Py_BuildValue("n", self->cxx->getWidth());
 BOB_CATCH_MEMBER("width", 0)
 }
 
-static int PyBobSpDCT2D_SetWidth
-(PyBobSpDCT2DObject* self, PyObject* o, void* /*closure*/) {
+static int PyBobSpDCT2D_SetWidth(PyBobSpDCT2DObject* self, PyObject* o, void* /*closure*/) {
 BOB_TRY
-
   if (!PyBob_NumberCheck(o)) {
     PyErr_Format(PyExc_TypeError, "`%s' width can only be set using a number, not `%s'", Py_TYPE(self)->tp_name, Py_TYPE(o)->tp_name);
     return -1;

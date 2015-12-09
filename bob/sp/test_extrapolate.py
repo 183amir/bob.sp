@@ -9,7 +9,7 @@ import os, sys
 import numpy
 import nose.tools
 
-from . import extrapolate_zero, extrapolate_circular, extrapolate_mirror, extrapolate_nearest, extrapolate_constant
+from bob.sp import extrapolate, extrapolate_zero, extrapolate_circular, extrapolate_mirror, extrapolate_nearest, extrapolate_constant
 
 #############################################################################
 # Tests blitz-based extrapolation implementation with values returned
@@ -201,3 +201,29 @@ def test_extrapolation_2D_mirror():
   B = numpy.zeros((11,11), numpy.float64)
   extrapolate_mirror(A22,B)
   _extrapolate_2D(B,A1111_mirror)
+
+def test_extrapolation():
+  # Copies some of the tests above, but this time using the raw extrapolate function
+  b = numpy.zeros((14,), numpy.float64)
+  extrapolate(a5,b)
+  _extrapolate_1D(b,a14_zeros)
+
+  B = numpy.zeros((4,4), numpy.float64)
+  extrapolate(A22,B, "Zero")
+  _extrapolate_2D(B,A44_zeros)
+
+  B = numpy.zeros((4,4), numpy.float64)
+  extrapolate(A22,B,"Constant", 2.)
+  _extrapolate_2D(B,A44_twos)
+
+  b = numpy.zeros((14,), numpy.float64)
+  extrapolate(a5,b,"NearestNeighbour")
+  _extrapolate_1D(b,a14_nearest)
+
+  B = numpy.zeros((4,4), numpy.float64)
+  extrapolate(A22,B, "Circular")
+  _extrapolate_2D(B,A44_circular)
+
+  b = numpy.zeros((26,), numpy.float64)
+  extrapolate(a5,b,"Mirror")
+  _extrapolate_1D(b,a26_mirror)

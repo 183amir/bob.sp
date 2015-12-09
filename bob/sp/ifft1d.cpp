@@ -7,117 +7,64 @@
  * Copyright (C) 2011-2013 Idiap Research Institute, Martigny, Switzerland
  */
 
-#include <bob.blitz/cppapi.h>
-#include <bob.blitz/cleanup.h>
-#include <bob.extension/defines.h>
-#include <bob.sp/FFT1D.h>
+#include "main.h"
 
-PyDoc_STRVAR(s_fft1d_str, BOB_EXT_MODULE_PREFIX ".IFFT1D");
-
-PyDoc_STRVAR(s_fft1d_doc,
-"IFFT1D(shape) -> new IFFT1D operator\n\
-\n\
-Calculates the inverse FFT of a 1D array/signal. Input and output\n\
-arrays are 1D NumPy arrays of type ``complex128``.\n\
-"
+static auto s_ifft1d = bob::extension::ClassDoc(
+  BOB_EXT_MODULE_PREFIX ".IFFT1D",
+  "Calculates the inverse FFT of a 1D array/signal",
+  "Input and output arrays are 1D NumPy arrays of type ``complex128``."
+)
+.add_constructor(bob::extension::FunctionDoc(
+  "IFFT1D",
+  "Creates a new IFFT1D extractor in the given dimensions"
+)
+.add_prototype("length", "")
+.add_prototype("other", "")
+.add_parameter("length", "int", "The length of the input signal this class will be able to handle")
+.add_parameter("other", ":py:class:`IFFT1D`", "The other IFFT1D class to copy-construct")
 );
 
-/**
- * Represents either an IFFT1D
- */
-typedef struct {
-  PyObject_HEAD
-  bob::sp::IFFT1D* cxx;
-} PyBobSpIFFT1DObject;
-
-extern PyTypeObject PyBobSpIFFT1D_Type; //forward declaration
+PyTypeObject PyBobSpIFFT1D_Type = {
+  PyVarObject_HEAD_INIT(0, 0)
+  0
+};
 
 int PyBobSpIFFT1D_Check(PyObject* o) {
   return PyObject_IsInstance(o, reinterpret_cast<PyObject*>(&PyBobSpIFFT1D_Type));
 }
 
-static void PyBobSpIFFT1D_Delete (PyBobSpIFFT1DObject* o) {
-
-  delete o->cxx;
-  Py_TYPE(o)->tp_free((PyObject*)o);
-
+static void PyBobSpIFFT1D_Delete (PyBobSpIFFT1DObject* self) {
+  self->cxx.reset();
+  Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static int PyBobSpIFFT1D_InitCopy
-(PyBobSpIFFT1DObject* self, PyObject* args, PyObject* kwds) {
+static int PyBobSpIFFT1D_InitCopy(PyBobSpIFFT1DObject* self, PyObject* args, PyObject* kwds) {
+  char** kwlist = s_ifft1d.kwlist(1);
 
-  /* Parses input arguments in a single shot */
-  static const char* const_kwlist[] = {"other", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+  PyBobSpIFFT1DObject* other;
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!", kwlist, &PyBobSpIFFT1D_Type, &other)) return -1;
 
-  PyObject* other = 0;
-
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!", kwlist,
-        &PyBobSpIFFT1D_Type, &other)) return -1;
-
-  auto copy = reinterpret_cast<PyBobSpIFFT1DObject*>(other);
-
-  try {
-    self->cxx = new bob::sp::IFFT1D(*(copy->cxx));
-    if (!self->cxx) {
-      PyErr_Format(PyExc_MemoryError, "cannot create new object of type `%s' - no more memory", Py_TYPE(self)->tp_name);
-      return -1;
-    }
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot create new object of type `%s' - unknown exception thrown", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx.reset(new bob::sp::IFFT1D(*(other->cxx)));
   return 0;
-
 }
 
-static int PyBobSpIFFT1D_InitShape(PyBobSpIFFT1DObject* self, PyObject *args,
-    PyObject* kwds) {
+static int PyBobSpIFFT1D_InitShape(PyBobSpIFFT1DObject* self, PyObject *args, PyObject* kwds) {
+  char** kwlist = s_ifft1d.kwlist(0);
 
-  /* Parses input arguments in a single shot */
-  static const char* const_kwlist[] = {"length", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
-
-  Py_ssize_t length = 0;
+  Py_ssize_t length;
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "n", kwlist, &length)) return -1;
 
-  try {
-    self->cxx = new bob::sp::IFFT1D(length);
-    if (!self->cxx) {
-      PyErr_Format(PyExc_MemoryError, "cannot create new object of type `%s' - no more memory", Py_TYPE(self)->tp_name);
-      return -1;
-    }
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot create new object of type `%s' - unknown exception thrown", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx.reset(new bob::sp::IFFT1D(length));
   return 0; ///< SUCCESS
-
 }
 
-static int PyBobSpIFFT1D_Init(PyBobSpIFFT1DObject* self,
-    PyObject* args, PyObject* kwds) {
-
+static int PyBobSpIFFT1D_Init(PyBobSpIFFT1DObject* self, PyObject* args, PyObject* kwds) {
+BOB_TRY
   Py_ssize_t nargs = (args?PyTuple_Size(args):0) + (kwds?PyDict_Size(kwds):0);
 
   switch (nargs) {
-
     case 1:
-
       {
-
         PyObject* arg = 0; ///< borrowed (don't delete)
         if (PyTuple_Size(args)) arg = PyTuple_GET_ITEM(args, 0);
         else {
@@ -126,43 +73,31 @@ static int PyBobSpIFFT1D_Init(PyBobSpIFFT1DObject* self,
           arg = PyList_GET_ITEM(tmp, 0);
         }
 
-        if (PyBob_NumberCheck(arg)) {
+        if (PyBob_NumberCheck(arg))
           return PyBobSpIFFT1D_InitShape(self, args, kwds);
-        }
 
-        if (PyBobSpIFFT1D_Check(arg)) {
+        if (PyBobSpIFFT1D_Check(arg))
           return PyBobSpIFFT1D_InitCopy(self, args, kwds);
-        }
 
         PyErr_Format(PyExc_TypeError, "cannot initialize `%s' with `%s' (see help)", Py_TYPE(self)->tp_name, Py_TYPE(arg)->tp_name);
-
       }
-
       break;
 
     default:
-
       PyErr_Format(PyExc_RuntimeError, "number of arguments mismatch - %s requires 1 argument, but you provided %" PY_FORMAT_SIZE_T "d (see help)", Py_TYPE(self)->tp_name, nargs);
-
   }
-
   return -1;
-
+BOB_CATCH_MEMBER("constructor", -1)
 }
 
 static PyObject* PyBobSpIFFT1D_Repr(PyBobSpIFFT1DObject* self) {
-  return
-# if PY_VERSION_HEX >= 0x03000000
-  PyUnicode_FromFormat
-# else
-  PyString_FromFormat
-# endif
-  ("%s(length=%zu)", Py_TYPE(self)->tp_name, self->cxx->getLength());
+BOB_TRY
+  return PyString_FromFormat("%s(length=%zu)", Py_TYPE(self)->tp_name, self->cxx->getLength());
+BOB_CATCH_MEMBER("__repr__", 0)
 }
 
-static PyObject* PyBobSpIFFT1D_RichCompare (PyBobSpIFFT1DObject* self,
-    PyObject* other, int op) {
-
+static PyObject* PyBobSpIFFT1D_RichCompare (PyBobSpIFFT1DObject* self, PyObject* other, int op) {
+BOB_TRY
   if (!PyBobSpIFFT1D_Check(other)) {
     PyErr_Format(PyExc_TypeError, "cannot compare `%s' with `%s'",
         Py_TYPE(self)->tp_name, Py_TYPE(other)->tp_name);
@@ -184,22 +119,22 @@ static PyObject* PyBobSpIFFT1D_RichCompare (PyBobSpIFFT1DObject* self,
       Py_INCREF(Py_NotImplemented);
       return Py_NotImplemented;
   }
-
+BOB_CATCH_MEMBER("RichCompare", 0)
 }
 
-PyDoc_STRVAR(s_length_str, "length");
-PyDoc_STRVAR(s_length_doc,
-"The length of the output vector\n\
-");
-
-static PyObject* PyBobSpIFFT1D_GetLength
-(PyBobSpIFFT1DObject* self, void* /*closure*/) {
+static auto s_length = bob::extension::VariableDoc(
+  "length",
+  "int",
+  "The length of the input and output vector"
+);
+static PyObject* PyBobSpIFFT1D_GetLength(PyBobSpIFFT1DObject* self, void* /*closure*/) {
+BOB_TRY
   return Py_BuildValue("n", self->cxx->getLength());
+BOB_CATCH_MEMBER("length", 0)
 }
 
-static int PyBobSpIFFT1D_SetLength
-(PyBobSpIFFT1DObject* self, PyObject* o, void* /*closure*/) {
-
+static int PyBobSpIFFT1D_SetLength(PyBobSpIFFT1DObject* self, PyObject* o, void* /*closure*/) {
+BOB_TRY
   if (!PyBob_NumberCheck(o)) {
     PyErr_Format(PyExc_TypeError, "`%s' length can only be set using a number, not `%s'", Py_TYPE(self)->tp_name, Py_TYPE(o)->tp_name);
     return -1;
@@ -208,35 +143,24 @@ static int PyBobSpIFFT1D_SetLength
   Py_ssize_t len = PyNumber_AsSsize_t(o, PyExc_OverflowError);
   if (PyErr_Occurred()) return -1;
 
-  try {
-    self->cxx->setLength(len);
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot reset `length' of %s: unknown exception caught", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx->setLength(len);
   return 0;
-
+BOB_CATCH_MEMBER("length", -1)
 }
 
-PyDoc_STRVAR(s_shape_str, "shape");
-PyDoc_STRVAR(s_shape_doc,
-"A tuple that represents the size of the output vector\n\
-");
-
-static PyObject* PyBobSpIFFT1D_GetShape
-(PyBobSpIFFT1DObject* self, void* /*closure*/) {
+static auto s_shape = bob::extension::VariableDoc(
+  "shape",
+  "(int)",
+  "A 1D tuple that represents the size of the input/output vector"
+);
+static PyObject* PyBobSpIFFT1D_GetShape(PyBobSpIFFT1DObject* self, void* /*closure*/) {
+BOB_TRY
   return Py_BuildValue("(n)", self->cxx->getLength());
+BOB_CATCH_MEMBER("shape", 0)
 }
 
-static int PyBobSpIFFT1D_SetShape
-(PyBobSpIFFT1DObject* self, PyObject* o, void* /*closure*/) {
-
+static int PyBobSpIFFT1D_SetShape(PyBobSpIFFT1DObject* self, PyObject* o, void* /*closure*/) {
+BOB_TRY
   if (!PySequence_Check(o)) {
     PyErr_Format(PyExc_TypeError, "`%s' shape can only be set using tuples (or sequences), not `%s'", Py_TYPE(self)->tp_name, Py_TYPE(o)->tp_name);
     return -1;
@@ -253,47 +177,46 @@ static int PyBobSpIFFT1D_SetShape
   Py_ssize_t len = PyNumber_AsSsize_t(PyTuple_GET_ITEM(shape, 0), PyExc_OverflowError);
   if (PyErr_Occurred()) return -1;
 
-  try {
-    self->cxx->setLength(len);
-  }
-  catch (std::exception& ex) {
-    PyErr_SetString(PyExc_RuntimeError, ex.what());
-    return -1;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "cannot reset `shape' of %s: unknown exception caught", Py_TYPE(self)->tp_name);
-    return -1;
-  }
-
+  self->cxx->setLength(len);
   return 0;
-
+BOB_CATCH_MEMBER("shape", -1)
 }
 
 static PyGetSetDef PyBobSpIFFT1D_getseters[] = {
     {
-      s_length_str,
+      s_length.name(),
       (getter)PyBobSpIFFT1D_GetLength,
       (setter)PyBobSpIFFT1D_SetLength,
-      s_length_doc,
+      s_length.doc(),
       0
     },
     {
-      s_shape_str,
+      s_shape.name(),
       (getter)PyBobSpIFFT1D_GetShape,
       (setter)PyBobSpIFFT1D_SetShape,
-      s_shape_doc,
+      s_shape.doc(),
       0
     },
     {0}  /* Sentinel */
 };
 
-static PyObject* PyBobSpIFFT1D_Call
-(PyBobSpIFFT1DObject* self, PyObject* args, PyObject* kwds) {
 
-  static const char* const_kwlist[] = {"input", "output", 0};
-  static char** kwlist = const_cast<char**>(const_kwlist);
+static auto s_transform = bob::extension::FunctionDoc(
+  "transform",
+  "Calculates the inverse FFT of the given signal",
+  ".. note:: The :py:meth:`__call__` function is a synonym for this function.",
+  true
+)
+.add_prototype("input, [output]", "output")
+.add_parameter("input", "array_like(1D, complex)", "The given input array. It must be of length :py:attr:`length`")
+.add_parameter("output", "array_like(1D, complex)", "A pre-allocated output array. If given, it must be of length :py:attr:`length`")
+.add_return("output", "array_like(1D, complex)", "The FFT result; identical to the ``output`` parameter, if given")
+;
+static PyObject* PyBobSpIFFT1D_transform(PyBobSpIFFT1DObject* self, PyObject* args, PyObject* kwds) {
+BOB_TRY
+  char** kwlist = s_transform.kwlist();
 
-  PyBlitzArrayObject* input = 0;
+  PyBlitzArrayObject* input;
   PyBlitzArrayObject* output = 0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&|O&", kwlist,
@@ -338,60 +261,39 @@ static PyObject* PyBobSpIFFT1D_Call
   }
 
   /** all basic checks are done, can call the operator now **/
-  try {
-    self->cxx->operator()(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input),
-        *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output));
-  }
-  catch (std::exception& e) {
-    PyErr_SetString(PyExc_RuntimeError, e.what());
-    return 0;
-  }
-  catch (...) {
-    PyErr_Format(PyExc_RuntimeError, "%s cannot operate on data: unknown exception caught", Py_TYPE(self)->tp_name);
-    return 0;
-  }
+  self->cxx->operator()(*PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(input), *PyBlitzArrayCxx_AsBlitz<std::complex<double>,1>(output));
 
-  return PyBlitzArray_NUMPY_WRAP(Py_BuildValue("O", output));
-
+  return PyBlitzArray_AsNumpyArray(output, 0);
+BOB_CATCH_MEMBER("transform", 0)
 }
 
-PyTypeObject PyBobSpIFFT1D_Type = {
-    PyVarObject_HEAD_INIT(0, 0)
-    s_fft1d_str,                              /*tp_name*/
-    sizeof(PyBobSpIFFT1DObject),              /*tp_basicsize*/
-    0,                                        /*tp_itemsize*/
-    (destructor)PyBobSpIFFT1D_Delete,         /*tp_dealloc*/
-    0,                                        /*tp_print*/
-    0,                                        /*tp_getattr*/
-    0,                                        /*tp_setattr*/
-    0,                                        /*tp_compare*/
-    (reprfunc)PyBobSpIFFT1D_Repr,             /*tp_repr*/
-    0,                                        /*tp_as_number*/
-    0,                                        /*tp_as_sequence*/
-    0,                                        /*tp_as_mapping*/
-    0,                                        /*tp_hash */
-    (ternaryfunc)PyBobSpIFFT1D_Call,          /* tp_call */
-    (reprfunc)PyBobSpIFFT1D_Repr,             /*tp_str*/
-    0,                                        /*tp_getattro*/
-    0,                                        /*tp_setattro*/
-    0,                                        /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-    s_fft1d_doc,                              /* tp_doc */
-    0,		                                    /* tp_traverse */
-    0,		                                    /* tp_clear */
-    (richcmpfunc)PyBobSpIFFT1D_RichCompare,   /* tp_richcompare */
-    0,		                                    /* tp_weaklistoffset */
-    0,		                                    /* tp_iter */
-    0,		                                    /* tp_iternext */
-    0,                                        /* tp_methods */
-    0,                                        /* tp_members */
-    PyBobSpIFFT1D_getseters,                  /* tp_getset */
-    0,                                        /* tp_base */
-    0,                                        /* tp_dict */
-    0,                                        /* tp_descr_get */
-    0,                                        /* tp_descr_set */
-    0,                                        /* tp_dictoffset */
-    (initproc)PyBobSpIFFT1D_Init,             /* tp_init */
-    0,                                        /* tp_alloc */
-    0,                                        /* tp_new */
+static PyMethodDef PyBobSpIFFT1D_methods[] = {
+    {
+      s_transform.name(),
+      (PyCFunction)PyBobSpIFFT1D_transform,
+      METH_VARARGS|METH_KEYWORDS,
+      s_transform.doc()
+    },
+    {0}  /* Sentinel */
 };
+
+bool init_BobSpIFFT1D(PyObject* module){
+  // class definition
+  PyBobSpIFFT1D_Type.tp_name = s_ifft1d.name();
+  PyBobSpIFFT1D_Type.tp_basicsize = sizeof(PyBobSpIFFT1DObject);
+  PyBobSpIFFT1D_Type.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+  PyBobSpIFFT1D_Type.tp_doc = s_ifft1d.doc();
+
+  PyBobSpIFFT1D_Type.tp_new = PyType_GenericNew;
+  PyBobSpIFFT1D_Type.tp_dealloc = reinterpret_cast<destructor>(PyBobSpIFFT1D_Delete);
+  PyBobSpIFFT1D_Type.tp_init = reinterpret_cast<initproc>(PyBobSpIFFT1D_Init);
+  PyBobSpIFFT1D_Type.tp_richcompare = reinterpret_cast<richcmpfunc>(PyBobSpIFFT1D_RichCompare);
+  PyBobSpIFFT1D_Type.tp_methods = PyBobSpIFFT1D_methods;
+  PyBobSpIFFT1D_Type.tp_getset = PyBobSpIFFT1D_getseters;
+  PyBobSpIFFT1D_Type.tp_call = reinterpret_cast<ternaryfunc>(PyBobSpIFFT1D_transform);
+  PyBobSpIFFT1D_Type.tp_repr = reinterpret_cast<reprfunc>(PyBobSpIFFT1D_Repr);
+
+  // check that everything is fine
+  if (PyType_Ready(&PyBobSpIFFT1D_Type) < 0) return false;
+  return PyModule_AddObject(module, "IFFT1D", Py_BuildValue("O", &PyBobSpIFFT1D_Type)) >= 0;
+}
