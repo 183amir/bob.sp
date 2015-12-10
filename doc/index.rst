@@ -10,10 +10,8 @@
  Bob's Signal Processing Routines
 ==================================
 
-.. todolist::
-
-This module contains base functionality from Bob bound to Python, available in
-the C++ counter-part ``bob::sp``. It includes core signal processing utilities.
+This module contains basic signal processing functionality from Bob bound to Python, available in the C++ counter-part ``bob::sp``.
+This functionality mainly includes Fast Fourier Transforms and Discrete Cosine Transforms, as well as functionality for extrapolation of 1D and 2D signals.
 
 Documentation
 -------------
@@ -23,6 +21,13 @@ Documentation
 
    py_api
    c_cpp_api
+
+
+TODO's
+------
+
+.. todolist::
+
 
 Indices and tables
 ------------------

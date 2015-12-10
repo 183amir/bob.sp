@@ -407,7 +407,7 @@ static PyGetSetDef PyBobSpQuantization_getseters[] = {
 static auto s_quantize = bob::extension::FunctionDoc(
   "quantize",
   "Quantizes the given input",
-  ".. todo:: Document exaxtly, what this function does, i.e., what is stored in the output array.\n\n"
+  ".. todo:: Document exactly, what this function does, i.e., what is stored in the output array.\n\n"
   ".. note:: The :py:meth:`__call__`` function is a synonym for this function, turning this object into a functor.",
   true
 )
